@@ -6,6 +6,8 @@ import (
 	"googlemaps.github.io/maps"
 	"log"
 	"os"
+	"strconv"
+	"time"
 )
 
 type CommuteTime struct {
@@ -31,12 +33,15 @@ func GetCommuteTimes(destinations []string, lat, long float32) []CommuteTime {
 		Origins:      []string{fmt.Sprintf("%f,%f", lat, long)},
 		Destinations: destinations,
 		Mode:         maps.TravelModeTransit,
+		TransitMode:  []maps.TransitMode{maps.TransitModeRail},
+		ArrivalTime:  GetClosestHourOnWeekday(9, 1),
 	}
 
 	rCycling := &maps.DistanceMatrixRequest{
 		Origins:      []string{fmt.Sprintf("%f,%f", lat, long)},
 		Destinations: destinations,
 		Mode:         maps.TravelModeBicycling,
+		ArrivalTime:  GetClosestHourOnWeekday(9, 1),
 	}
 
 	respTransport, err := c.DistanceMatrix(context.Background(), rTransport)
@@ -65,4 +70,14 @@ func GetCommuteTimes(destinations []string, lat, long float32) []CommuteTime {
 	}
 
 	return commuteTimes
+}
+
+func GetClosestHourOnWeekday(hour, weekday int64) string {
+	now := time.Now().Round(time.Hour)
+	daysToMonday := int64(now.Weekday()) - weekday
+	hoursTo9Am := int64(now.Hour()) - hour
+
+	now = now.Add(time.Hour * 24 * time.Duration(daysToMonday))
+	now = now.Add(time.Hour * time.Duration(hoursTo9Am))
+	return strconv.FormatInt(now.Unix(), 10)
 }
