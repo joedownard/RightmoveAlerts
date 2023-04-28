@@ -201,30 +201,39 @@ func GetPropertyIdsWithLocationFromRightmoveSearchURL(searchURL string) []Proper
 	values.Add("currencyCode", "GBP")
 	values.Add("isFetching", "false")
 
-	startIndex := "0"
-	resp := RightmoveAPIResponse{
-		Pagination: struct {
-			Next *string `json:"next"`
-		}{Next: &startIndex},
+	idToIdWithLoc := make(map[int64]PropertyIdWithLocation)
+
+	// The Rightmove API is inconsistent so we call it several times to practically eliminate this issue
+	for i := 0; i < 15; i++ {
+		startIndex := "0"
+		resp := RightmoveAPIResponse{
+			Pagination: struct {
+				Next *string `json:"next"`
+			}{Next: &startIndex},
+		}
+
+		for resp.Pagination.Next != nil {
+			values.Set("index", *resp.Pagination.Next)
+
+			query := RightmoveAPIBase + values.Encode()
+			raw := RunQuery(query)
+
+			resp = RightmoveAPIResponse{}
+			err = json.Unmarshal(raw, &resp)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			for _, p := range resp.Properties {
+				idToIdWithLoc[p.Id] = p
+			}
+		}
 	}
 
 	var idsWithLoc []PropertyIdWithLocation
 
-	for resp.Pagination.Next != nil {
-		values.Set("index", *resp.Pagination.Next)
-
-		query := RightmoveAPIBase + values.Encode()
-		raw := RunQuery(query)
-
-		resp = RightmoveAPIResponse{}
-		err = json.Unmarshal(raw, &resp)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		for _, p := range resp.Properties {
-			idsWithLoc = append(idsWithLoc, p)
-		}
+	for _, p := range idToIdWithLoc {
+		idsWithLoc = append(idsWithLoc, p)
 	}
 
 	return idsWithLoc

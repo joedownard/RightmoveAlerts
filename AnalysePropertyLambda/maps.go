@@ -20,7 +20,7 @@ var (
 	GoogleMapsApiKey = os.Getenv("GOOGLE_MAPS_API_KEY")
 )
 
-func GetCommuteTimes(destinations []string, lat, long float32) []CommuteTime {
+func GetCommuteTimes(destinations []string, lat, long float64) []CommuteTime {
 	fmt.Printf("Checking commute times to location with lat: %f, long: %f\n", lat, long)
 
 	c, err := maps.NewClient(maps.WithAPIKey(GoogleMapsApiKey))
@@ -70,6 +70,33 @@ func GetCommuteTimes(destinations []string, lat, long float32) []CommuteTime {
 	}
 
 	return commuteTimes
+}
+
+func GetWalkingTime(sLat, sLng, dLat, dLng float64) float64 {
+	fmt.Printf("Checking walking time to location with lat: %f, long: %f from location with lat: %f, long: %f\n", dLat, dLng, sLat, sLng)
+
+	c, err := maps.NewClient(maps.WithAPIKey(GoogleMapsApiKey))
+	if err != nil {
+		log.Println(err)
+		return 0
+	}
+
+	rWalking := &maps.DistanceMatrixRequest{
+		Origins:      []string{fmt.Sprintf("%f,%f", dLat, dLng)},
+		Destinations: []string{fmt.Sprintf("%f,%f", sLat, sLng)},
+		Mode:         maps.TravelModeWalking,
+		ArrivalTime:  GetClosestHourOnWeekday(9, 1),
+	}
+
+	respWalking, err := c.DistanceMatrix(context.Background(), rWalking)
+	if err != nil {
+		log.Println(err)
+		return 0
+	}
+
+	walkingResults := respWalking.Rows[0].Elements
+
+	return walkingResults[0].Duration.Minutes()
 }
 
 func GetClosestHourOnWeekday(hour, weekday int64) string {

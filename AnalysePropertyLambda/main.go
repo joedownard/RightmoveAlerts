@@ -55,8 +55,8 @@ type ImageResource struct {
 type PropertyIdWithLocation struct {
 	Id       int64 `json:"Id"`
 	Location struct {
-		Latitude  float32 `json:"Latitude"`
-		Longitude float32 `json:"Longitude"`
+		Latitude  float64 `json:"Latitude"`
+		Longitude float64 `json:"Longitude"`
 	} `json:"Location"`
 }
 
@@ -92,6 +92,8 @@ func HandleRequest(sqsEvent events.SQSEvent) error {
 		event := Event{}
 		err := json.Unmarshal([]byte(message.Body), &event)
 
+		lat, lng := event.PropertyDetails.Location.Latitude, event.PropertyDetails.Location.Longitude
+
 		fmt.Printf("Got event with search id: %d\n", event.SearchId)
 
 		search, err := GetSearch(event.SearchId)
@@ -126,7 +128,7 @@ func HandleRequest(sqsEvent events.SQSEvent) error {
 			description.WriteRune('\n')
 		}
 
-		commuteTimes := GetCommuteTimes(search.Destinations, event.PropertyDetails.Location.Latitude, event.PropertyDetails.Location.Longitude)
+		commuteTimes := GetCommuteTimes(search.Destinations, lat, lng)
 		overMaxCommute := false
 		for _, t := range commuteTimes {
 			if (t.TimeMinutesTube * 60) > search.MaxCommuteTimeSeconds {
@@ -138,6 +140,12 @@ func HandleRequest(sqsEvent events.SQSEvent) error {
 		if overMaxCommute {
 			fmt.Println("Commute too long, skipping property.")
 			continue
+		}
+
+		closestHub, err := GetClosestHubLatLng(lat, lng)
+		if err == nil {
+			timeToCyclingHub := GetWalkingTime(lat, lng, closestHub.Location.Lat, closestHub.Location.Lng)
+			description.WriteString(fmt.Sprintf("\n🚴 Hub (%s): %dm", closestHub.StationName, int(timeToCyclingHub)))
 		}
 
 		message := WebhookRequest{
